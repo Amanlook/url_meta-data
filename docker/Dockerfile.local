@@ -1,0 +1,41 @@
+# Use the official Python image from the Docker Hub
+FROM python:3.14-slim
+
+# App base config
+ENV APP_HOME=/app \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/usr/local
+
+WORKDIR $APP_HOME
+
+# Install system dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        curl git gcc python3-dev\
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip and install uv globally
+RUN pip install --upgrade pip && pip install uv
+
+# Copy dependency definitions
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies into the venv
+RUN uv sync --dev
+
+# Copy the app code
+COPY . /app
+
+# Copy and setup the entrypoint script
+COPY ./docker/entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Set entrypoint and default command
+ENTRYPOINT ["entrypoint.sh"]
+
+CMD ["fastapi", "dev", "src/main.py", "--host", "0.0.0.0", "--port", "8000"]
